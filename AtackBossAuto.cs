@@ -11,17 +11,13 @@ namespace RutonyChat
         public string FileDirectory = "";
         public string filename = "";
         public string filenamejpg = "";
-        public string file = "";
-        public string fileHeroe = "";
-        public string fileHeroeSkill = "";
-        public string format = "";
         public string fileLogi = "";
-
         public Random rnd = new Random();
-
         private string twnick = "";
         public Warriors players;
+        public listBosses ListBosses;
 
+        public currentBoss CurrentBoss;
 
         public void InitParams(string param)
         {
@@ -32,15 +28,18 @@ namespace RutonyChat
             }
             filename = FileDirectory + @"\CurrentBoss.json";
             filenamejpg = FileDirectory + @"\CurrentBoss.png";
-            file = FileDirectory + @"\dragonwarriors.json";
             fileLogi = FileDirectory + @"\Logirovanie.txt";
             twnick = RutonyBot.TwitchBot.NICK.ToLower();
-			players = GetListWarriors();
+            players = GetListWarriors();
+            ListBosses = GetListBosses();
             RutonyBot.SayToWindow("Скрипт атаки босса успешно подключен");
         }
 
         public void Closing()
         {
+            savePlayerList();
+            players = new Warriors();
+            ListBosses = new listBosses();
             RutonyBot.SayToWindow("Скрипт атаки босса отключен");
         }
 
@@ -53,45 +52,129 @@ namespace RutonyChat
                     return;
                 }
             }
-            bool TextHasAtack = text.ToLower().Contains("!атака");
-            if (TextHasAtack == true)
+            /* bool TextHasAtack = text.ToLower().Contains("!атака");
+             if (TextHasAtack == true)
+             {
+                 Atack(name, site);
+             }
+             bool TextHasHeal = text.ToLower().Contains("!хил");
+             if (TextHasHeal == true)
+             {
+                 Heal(name, site, text);
+             }
+             bool TextHasMassHeal = text.ToLower().Contains("!массхил");
+             if (TextHasMassHeal == true)
+             {
+                 MassHeal(name, site);
+             }
+             bool TextHasPersonag = text.ToLower().Contains("!персонаж");
+             if (TextHasPersonag == true)
+             {
+                 Personag(name, site);
+             }*/
+            switch (text.ToLower())
             {
-                Atack();
+                case "!атака":
+                    Atack(name, site);
+                    break;
+                case "!хил":
+                    Heal(name, site, text);
+                    break;
+                case "!массхил":
+                    MassHeal(name, site);
+                    break;
+                case "!персонаж":
+                    Personag(name, site);
+                    break;
             }
-
-            bool TextHasHeal = text.ToLower().Contains("!хил");
-            if (TextHasHeal == true)
+            if (text.ToLower().Contains("!прокачать"))
             {
-                Heal();
-            }
-            bool TextHasMassHeal = text.ToLower().Contains("!массхил");
-            if (TextHasMassHeal == true)
-            {
-                MassHeal();
+                UpgradeSkill(name, site, text);
             }
         }
-
-        public void Atack()
+        public void UpgradeSkill(string name, string site, string text)
         {
-            fileHeroe = FileDirectory + @"\HeroeList\" + name + ".json";
-            if (!File.Exists(filename))
+            Hero thisWarrior = GetWarrior(name, site);
+
+            string[] arrSplit = text.Split(' ');
+            string NameSkill = text.Replace(arrSplit[0] + " ", "");
+            int CurLvlUpSkill = 0;
+
+            switch (NameSkill)
             {
-                RutonyBot.BotSay(site, "Босс еще не появился! Попросите администратора об этом!");
-                return;
+                case "хп":
+                    CurLvlUpSkill = thisWarrior.HP - 100;
+                    CurLvlUpSkill = (CurLvlUpSkill / 10);
+                    thisWarrior.HP += (CheckExpHero(thisWarrior, CurLvlUpSkill, site)) ? 10 : 0;
+                    break;
+                case "урон":
+                    CurLvlUpSkill = thisWarrior.Damage - 1;
+                    thisWarrior.Damage += (CheckExpHero(thisWarrior, CurLvlUpSkill, site)) ? 1 : 0;
+                    break;
+                case "броня":
+                    CurLvlUpSkill = thisWarrior.Armor - 1;
+                    thisWarrior.Armor += (CheckExpHero(thisWarrior, CurLvlUpSkill, site)) ? 1 : 0;
+                    break;
+                case "мана":
+                    CurLvlUpSkill = thisWarrior.Mana - 0;
+                    CurLvlUpSkill = (CurLvlUpSkill / 10);
+                    thisWarrior.Mana += (CheckExpHero(thisWarrior, CurLvlUpSkill, site)) ? 10 : 0;
+                    break;
+                case "хил":
+                    CurLvlUpSkill = thisWarrior.heroSkill.Heal - 0;
+                    CurLvlUpSkill = (CurLvlUpSkill / 5);
+                    thisWarrior.heroSkill.Heal += (CheckExpHero(thisWarrior, CurLvlUpSkill, site)) ? 5 : 0;
+                    break;
+                case "массхил":
+                    CurLvlUpSkill = thisWarrior.heroSkill.MassHeal - 0;
+                    thisWarrior.heroSkill.MassHeal += (CheckExpHero(thisWarrior, CurLvlUpSkill, site)) ? 1 : 0;
+                    break;
+                default:
+                    RutonyBot.BotSay(site, name + ", не понимаю, что хочешь прокачать. Можно прокачать : хп, урон, броня, мана, хил, массхил");
+                    return;
             }
-            if (!File.Exists(fileHeroe))
+            thisWarrior.Experience -= (100 + (CurLvlUpSkill * 10));
+            Personag(name, site);
+
+        }
+        public Boolean CheckExpHero(Hero thisWarrior, int CurLvlUpSkill, string site)
+        {
+            if (thisWarrior.Experience < (100 + (CurLvlUpSkill * 10)))
             {
-                RutonyBot.BotSay(site, "В начале требуется создать своего героя");
-                return;
+                RutonyBot.BotSay(site, "Не хватает опыта. Текущее количество " + Convert.ToString(thisWarrior.Experience) + ". Надо : " + Convert.ToString((100 + (CurLvlUpSkill * 10))));
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
+        public void Personag(string name, string site)
+        {
+            Hero thisWarrior = GetWarrior(name, site);
+            RutonyBot.BotSay(site, thisWarrior.ToString());
+        }
+        public void Atack(string name, string site)
+        {
+            if (CurrentBoss == null || CurrentBoss.CurrentHP == 0)
+            {
+                if (!File.Exists(filename))
+                {
+                    RutonyBot.BotSay(site, "Босс еще не появился! Попросите администратора об этом!");
+                    return;
+                }
+                else
+                {
+                    CurrentBoss = JsonConvert.DeserializeObject<currentBoss>(File.ReadAllText(filename));
+                }
             }
 
-            STCurrentHeroe = JsonConvert.DeserializeObject<StatHeroes>(File.ReadAllText(fileHeroe));
-            if (STCurrentHeroe.CurrentHP <= 0)
+            Hero thiswarrior = GetWarrior(name, site);
+            if (thiswarrior.CurrentHP <= 0)
             {
                 RutonyBot.BotSay(site, name + ", у тебя не осталось здоровья. You died.");
                 return;
             }
-            STCurrentBoss = JsonConvert.DeserializeObject<StatCurrentBoss>(File.ReadAllText(filename));
 
             int rndAtack = rnd.Next(1, 100);
             int rndAvoid = rnd.Next(1, 100);
@@ -101,75 +184,42 @@ namespace RutonyChat
             int CurDamageBoss = 0;
 
             string OutPutMessage;
-            string serializedTakeDamage;
-            if (rndAvoid <= STCurrentBoss.ChanceAvoid)
+            if (rndAvoid <= CurrentBoss.ChanceAvoid)
             {
                 CurDamage = 0;
-                OutPutMessage = string.Format("{1} уклоняется от удара {0}", name, STCurrentBoss.Name);
+                OutPutMessage = string.Format("{1} уклоняется от удара {0}", name, CurrentBoss.Name);
             }
-            else if (rndBlock <= STCurrentBoss.ChanceBlock)
+            else if (rndBlock <= CurrentBoss.ChanceBlock)
             {
                 CurDamage = 0;
-                CurDamageBoss = (STCurrentBoss.Damage - STCurrentHeroe.Armor);
+                CurDamageBoss = (CurrentBoss.Damage - thiswarrior.Armor);
                 CurDamageBoss = Math.Max(1, CurDamageBoss);
-                STCurrentHeroe.CurrentHP -= CurDamageBoss;
+                thiswarrior.CurrentHP -= CurDamageBoss;
 
-                serializedTakeDamage = JsonConvert.SerializeObject(STCurrentHeroe);
-                File.WriteAllText(fileHeroe, serializedTakeDamage);
-
-                OutPutMessage = string.Format("{1} блокирует удар {0} и наносит в ответ {2} урона", name, STCurrentBoss.Name, CurDamageBoss);
+                OutPutMessage = string.Format("{1} блокирует удар {0} и наносит в ответ {2} урона", name, CurrentBoss.Name, CurDamageBoss);
             }
             else
             {
-                CurDamage += (STCurrentHeroe.Damage - STCurrentBoss.Armor);
+                CurDamage += (thiswarrior.Damage - CurrentBoss.Armor);
                 CurDamage = Math.Max(1, CurDamage);
-                STCurrentBoss.CurrentHP -= CurDamage;
-                OutPutMessage = string.Format("{0} бьет {3}а на {1} урона! У {3} осталось {2} здоровья!", name, CurDamage, STCurrentBoss.CurrentHP, STCurrentBoss.Name);
+                CurrentBoss.CurrentHP -= CurDamage;
+                OutPutMessage = string.Format("{0} бьет {3}а на {1} урона! У {3} осталось {2} здоровья!", name, CurDamage, CurrentBoss.CurrentHP, CurrentBoss.Name);
             }
-            AddWarrior(name, CurDamage, site);
+            thiswarrior.DoneDamage += CurDamage;
             RutonyBotFunctions.FileAddString(fileLogi, OutPutMessage);
+            UpdateLabels();
 
-            players = GetListWarriors();
-            format = "";
-            if (STCurrentBoss.CurrentHP > 0)
+            if (CurrentBoss.CurrentHP <= 0)
             {
-                try
+                string format = "";
+                RutonyBot.BotSay(site, string.Format("{0} добивает {1}а! Всем участники получают опыт!", name, CurrentBoss.Name));
+                foreach (Hero player in players.ListWarriors)
                 {
-                    File.Delete(filename);
+                    format += "" + player.Name + " + " + player.DoneDamage + " EXP" + Environment.NewLine;
                 }
-                catch { }
-
-                string serialized = JsonConvert.SerializeObject(STCurrentBoss);
-                File.WriteAllText(filename, serialized);
-                return;
-            }
-
-            if (STCurrentBoss.CurrentHP <= 0)
-            {
-                RutonyBot.BotSay(site, string.Format("{0} добивает {1}а! Всем участники получают опыт!", name, STCurrentBoss.Name));
-                foreach (Warrior player in players.ListWarriors)
-                {
-                    string fileplayerHeroe = FileDirectory + @"\HeroeList\" + player.name + ".json";
-                    STCurrentHeroe = JsonConvert.DeserializeObject<StatHeroes>(File.ReadAllText(fileplayerHeroe));
-                    STCurrentHeroe.Experience += player.damage;
-                    STCurrentHeroe.CurrentHP = STCurrentHeroe.HP;
-                    STCurrentHeroe.CurrentMana = STCurrentHeroe.Mana;
-
-                    string serialized = JsonConvert.SerializeObject(STCurrentHeroe);
-                    File.WriteAllText(fileplayerHeroe, serialized);
-
-                    RutonyBotFunctions.FileAddString(fileLogi, player.name + " получил " + player.damage + " опыта!");
-
-                    format += "" + player.name + " + " + player.damage + " EXP" + Environment.NewLine;
-                }
+                savePlayerList();
                 LabelBase.DictLabels[LabelBase.LabelType.Counter2].Format = format;
                 LabelBase.DictLabels[LabelBase.LabelType.Counter2].Save();
-
-                try
-                {
-                    File.Delete(file);
-                }
-                catch { }
 
                 try
                 {
@@ -183,20 +233,48 @@ namespace RutonyChat
                 catch { }
             }
         }
-
-        public void Heal()
+        public void UpdateLabels()
         {
-            fileHeroe = FileDirectory + @"\HeroeList\" + name + ".json";
-            fileHeroeSkill = FileDirectory + @"\HeroeList\" + name + "Skill.json";
+            LabelBase.DictLabels[LabelBase.LabelType.Counter1].Format = "Name : " + CurrentBoss.Name + Environment.NewLine + "HP : " + CurrentBoss.CurrentHP;
+            LabelBase.DictLabels[LabelBase.LabelType.Counter1].Save();
 
-            if (!File.Exists(filename))
+            LabelBase.DictLabels[LabelBase.LabelType.Counter2].Format = "";
+            foreach (Hero player in players.ListWarriors)
             {
-                RutonyBot.BotSay(site, "Босс еще не появился! Попросите администратора об этом!");
-                return;
+                LabelBase.DictLabels[LabelBase.LabelType.Counter2].Format += player.Name + "(" + player.CurrentHP + "/" + player.Mana + ")" + Environment.NewLine;
             }
+            LabelBase.DictLabels[LabelBase.LabelType.Counter2].Save();
+        }
+        public void savePlayerList()
+        {
+            foreach (Hero player in players.ListWarriors)
+            {
+                string fileplayerHeroe = FileDirectory + @"\HeroeList\" + player.Name + ".json";
+                player.Experience += player.DoneDamage;
+                player.DoneDamage = 0;
+                player.CurrentHP = player.HP;
+                player.CurrentMana = player.Mana;
 
-            STCurrentHeroe = JsonConvert.DeserializeObject<StatHeroes>(File.ReadAllText(fileHeroe));
-            if ((STCurrentHeroe.CurrentMana / 5) <= 0)
+                string serialized = JsonConvert.SerializeObject(player);
+                File.WriteAllText(fileplayerHeroe, serialized);
+            }
+        }
+        public void Heal(string name, string site, string text)
+        {
+            if (CurrentBoss.CurrentHP == 0)
+            {
+                if (!File.Exists(filename))
+                {
+                    RutonyBot.BotSay(site, "Босс еще не появился! Попросите администратора об этом!");
+                    return;
+                }
+                else
+                {
+                    CurrentBoss = JsonConvert.DeserializeObject<currentBoss>(File.ReadAllText(filename));
+                }
+            }
+            Hero thiswarrior = GetWarrior(name, site);
+            if ((thiswarrior.CurrentMana / 5) <= 0)
             {
                 RutonyBot.BotSay(site, name + ", у тебя не хватает маны");
                 return;
@@ -214,172 +292,179 @@ namespace RutonyChat
                 VoteName = arrSplit[1];
             }
 
-            StatHeroes STPlayerForHeal;
-            string fileHeroForHeal = FileDirectory + @"\HeroeList\" + VoteName + ".json";
-            if (!File.Exists(fileHeroForHeal))
-            {
-                RutonyBot.BotSay(site, name + ", не нашли игрока " + VoteName);
-                return;
-            }
+            Hero warriorForheal = GetWarrior(VoteName, site);
             if (VoteName == name)
             {
-                STPlayerForHeal = STCurrentHeroe;
+                warriorForheal = thiswarrior;
             }
-            else
-            {
-                STPlayerForHeal = JsonConvert.DeserializeObject<StatHeroes>(File.ReadAllText(fileHeroForHeal));
-            }
-            STCurrentHeroSkill = JsonConvert.DeserializeObject<StatHeroSkill>(File.ReadAllText(fileHeroeSkill));
-            if (STPlayerForHeal.CurrentHP <= 0)
+
+            if (warriorForheal.CurrentHP <= 0)
             {
                 RutonyBot.BotSay(site, name + " извини, но " + VoteName + " мертв");
                 return;
             }
 
-            STCurrentHeroe.CurrentMana -= 5;
+            thiswarrior.CurrentMana -= 5;
             int CurHeal = 0;
-            if ((STPlayerForHeal.CurrentHP + STCurrentHeroSkill.Heal) > STPlayerForHeal.HP)
+            if ((warriorForheal.CurrentHP + thiswarrior.heroSkill.Heal) > warriorForheal.HP)
             {
-                CurHeal = (STPlayerForHeal.HP - STPlayerForHeal.CurrentHP);
+                CurHeal = (warriorForheal.HP - warriorForheal.CurrentHP);
             }
             else
             {
-                CurHeal = STCurrentHeroSkill.Heal;
+                CurHeal = thiswarrior.heroSkill.Heal;
             }
-            STPlayerForHeal.CurrentHP += CurHeal;
-            AddWarrior(name, CurHeal, site);
-
-            if (name == VoteName)
-            {
-                string serialized = JsonConvert.SerializeObject(STCurrentHeroe);
-                File.WriteAllText(fileHeroe, serialized);
-            }
-            else
-            {
-                string serialized = JsonConvert.SerializeObject(STPlayerForHeal);
-                File.WriteAllText(fileHeroForHeal, serialized);
-                serialized = JsonConvert.SerializeObject(STCurrentHeroe);
-                File.WriteAllText(fileHeroe, serialized);
-            }
+            warriorForheal.CurrentHP += CurHeal;
+            thiswarrior.DoneDamage += CurHeal;
             RutonyBotFunctions.FileAddString(fileLogi, name + " отхилил " + VoteName + " на " + CurHeal + " хп");
+            UpdateLabels();
         }
-
-        public void MassHeal()
+        public void MassHeal(string name, string site)
         {
-            fileHeroe = FileDirectory + @"\HeroeList\" + name + ".json";
-            fileHeroeSkill = FileDirectory + @"\HeroeList\" + name + "Skill.json";
-
-            if (!File.Exists(filename))
+            if (CurrentBoss.CurrentHP == 0)
             {
-                RutonyBot.BotSay(site, "Босс еще не появился! Попросите администратора об этом!");
-                return;
+                if (!File.Exists(filename))
+                {
+                    RutonyBot.BotSay(site, "Босс еще не появился! Попросите администратора об этом!");
+                    return;
+                }
+                else
+                {
+                    CurrentBoss = JsonConvert.DeserializeObject<currentBoss>(File.ReadAllText(filename));
+                }
             }
 
-            STCurrentHeroe = JsonConvert.DeserializeObject<StatHeroes>(File.ReadAllText(fileHeroe));
-            if ((STCurrentHeroe.CurrentMana / 50) <= 0)
+            Hero thiswarrior = GetWarrior(name, site);
+            if ((thiswarrior.CurrentMana / 50) <= 0)
             {
                 RutonyBot.BotSay(site, name + ", у тебя не хватает маны");
                 return;
             }
 
-            STCurrentHeroe.CurrentMana -= 50;
-            string serialized = JsonConvert.SerializeObject(STCurrentHeroe);
-            File.WriteAllText(fileHeroe, serialized);
-
-            players = GetListWarriors();
-            StatHeroes STPlayerForHeal;
-            STCurrentHeroSkill = JsonConvert.DeserializeObject<StatHeroSkill>(File.ReadAllText(fileHeroeSkill));
+            thiswarrior.CurrentMana -= 50;
 
             int SumHeal = 0;
             int CurHeal = 0;
-
-            string fileCurHero = "";
-            string serializedPlayerForHeal = "";
-            foreach (Warrior player in players.ListWarriors)
+            foreach (Hero player in players.ListWarriors)
             {
-                fileCurHero = FileDirectory + @"\HeroeList\" + player.name + ".json";
-                STPlayerForHeal = JsonConvert.DeserializeObject<StatHeroes>(File.ReadAllText(fileCurHero));
-                if ((STPlayerForHeal.CurrentHP + STCurrentHeroSkill.MassHeal) > STPlayerForHeal.HP)
+                if ((player.CurrentHP + thiswarrior.heroSkill.MassHeal) > player.HP)
                 {
-                    CurHeal = (STPlayerForHeal.HP - STPlayerForHeal.CurrentHP);
+                    CurHeal = (player.HP - player.CurrentHP);
                 }
                 else
                 {
-                    CurHeal = STCurrentHeroSkill.MassHeal;
+                    CurHeal = thiswarrior.heroSkill.MassHeal;
                 }
                 SumHeal += CurHeal;
-                STPlayerForHeal.CurrentHP += CurHeal;
-
-                serializedPlayerForHeal = JsonConvert.SerializeObject(STPlayerForHeal);
-                File.WriteAllText(fileCurHero, serializedPlayerForHeal);
-
-                RutonyBotFunctions.FileAddString(fileLogi, name + " отхилил " + player.name + " на " + CurHeal + " хп");
+                player.CurrentHP += CurHeal;
+                RutonyBot.BotSay(site, name + " отхилил " + player.Name + " на " + CurHeal + " хп");
             }
-            AddWarrior(name, SumHeal, site);
+            thiswarrior.DoneDamage += SumHeal;
+            UpdateLabels();
         }
         public void NewAlert(string site, string typeEvent, string subplan, string name, string text, float donate, string currency, int qty)
         {
 
         }
-
         public Warriors GetListWarriors()
         {
             players = new Warriors();
-            if (File.Exists(file))
-            {
-                players = JsonConvert.DeserializeObject<Warriors>(File.ReadAllText(file));
-            }
             return players;
         }
+        public listBosses GetListBosses()
+        {
+            listBosses ListBosses = new listBosses();
+            string fileListBosses = FileDirectory + @"\NOD\ListBoss.json";
 
+
+            if (File.Exists(fileListBosses))
+            {
+                string[] filetexts = File.ReadAllLines(fileListBosses);
+
+                ListBosses = JsonConvert.DeserializeObject<listBosses>(filetexts[0]);
+
+            }
+
+            foreach (currentBoss boss in ListBosses.ListBosses)
+            {
+                string filenameBoss = FileDirectory + @"\NOD\" + boss.Name + ".json";
+                currentBoss fileBoss = JsonConvert.DeserializeObject<currentBoss>(File.ReadAllText(filenameBoss));
+                boss.HP = fileBoss.HP;
+                boss.Armor = fileBoss.Armor;
+                boss.ChanceAvoid = fileBoss.ChanceAvoid;
+                boss.ChanceBlock = fileBoss.ChanceBlock;
+                boss.CurrentHP = fileBoss.CurrentHP;
+                boss.Damage = fileBoss.Damage;
+            }
+            return ListBosses;
+        }
+        public Hero GetWarrior(string username, string site)
+        {
+            Hero thiswarrior = players.ListWarriors.Find(r => r.Name == username.Trim().ToLower());
+            if (thiswarrior == null)
+            {
+                AddWarrior(username, 0, site);
+                thiswarrior = players.ListWarriors.Find(r => r.Name == username.Trim().ToLower());
+            }
+            return thiswarrior;
+
+        }
         public void AddWarrior(string username, int vklad, string site)
         {
-            Warrior thiswarrior = players.ListWarriors.Find(r => r.name == username.Trim().ToLower());
+            Hero thiswarrior = players.ListWarriors.Find(r => r.Name == username.Trim().ToLower());
+            string serializedSkill = "";
+            string serialized = "";
 
             if (thiswarrior == null)
             {
-                players.ListWarriors.Add(new Warrior() { name = username.Trim().ToLower(), damage = vklad });
-                thiswarrior = players.ListWarriors.Find(r => r.name == username.Trim().ToLower());
+                string fileHeroe = FileDirectory + @"\HeroeList\" + username + ".json";
+                string fileHeroeSkill = FileDirectory + @"\HeroeList\" + username + "Skill.json";
+                string fileDefaultSkill = FileDirectory + @"\NOD\DefaultHeroSkill.json";
+                string fileDefault = FileDirectory + @"\NOD\DefaultHero.json";
 
-                try
+                thiswarrior = new Hero();
+
+                if (!File.Exists(fileHeroe))
                 {
-                    File.Delete(file);
+                    thiswarrior = JsonConvert.DeserializeObject<Hero>(File.ReadAllText(fileDefault));
                 }
-                catch { }
+                else
+                {
+                    thiswarrior = JsonConvert.DeserializeObject<Hero>(File.ReadAllText(fileHeroe));
+                }
 
-                string serialized = JsonConvert.SerializeObject(players);
-                RutonyBotFunctions.FileAddString(file, serialized);
+                if (!File.Exists(fileHeroeSkill))
+                {
+                    thiswarrior.heroSkill = JsonConvert.DeserializeObject<heroSkill>(File.ReadAllText(fileDefaultSkill));
+                }
+                else
+                {
+                    thiswarrior.heroSkill = JsonConvert.DeserializeObject<heroSkill>(File.ReadAllText(fileHeroeSkill));
+                }
+                thiswarrior.Name = username.Trim().ToLower();
+                thiswarrior.DoneDamage = 0;
+
+                serializedSkill = JsonConvert.SerializeObject(thiswarrior.heroSkill);
+                File.WriteAllText(fileHeroeSkill, serializedSkill);
+                serialized = JsonConvert.SerializeObject(thiswarrior);
+                File.WriteAllText(fileHeroe, serialized);
+
+                players.ListWarriors.Add(thiswarrior);
             }
             else
             {
-                thiswarrior.damage += vklad;
-                try
-                {
-                    File.Delete(file);
-                }
-                catch { }
-                string serialized = JsonConvert.SerializeObject(players);
-                RutonyBotFunctions.FileAddString(file, serialized);
+                thiswarrior.DoneDamage += vklad;
             }
         }
     }
-
     public class Warriors
     {
-        public List<Warrior> ListWarriors = new List<Warrior>();
+        public List<Hero> ListWarriors = new List<Hero>();
     }
-
-    public class Warrior
-    {
-        public Hero hero { get; set; }
-        public int damage { get; set; }
-    }
-
     public class listBosses
     {
         public List<currentBoss> ListBosses = new List<currentBoss>();
     }
-
     public class currentBoss
     {
         public string Name { get; set; }
@@ -390,7 +475,6 @@ namespace RutonyChat
         public int Damage { get; set; }
         public int Armor { get; set; }
     }
-
     public class Hero
     {
         public string Name { get; set; }
@@ -399,13 +483,29 @@ namespace RutonyChat
         public int Mana { get; set; }
         public int CurrentMana { get; set; }
         public int Damage { get; set; }
+        public int DoneDamage { get; set; }
         public int Armor { get; set; }
         public int Experience { get; set; }
-        public heroSkill HeroSkill { get; set; }
+        public heroSkill heroSkill { get; set; }
+
+        override
+        public String ToString()
+        {
+            return ("Name - " + Name + "; "
+                    + "HP - " + HP + "; "
+                    + "CurrentHP - " + CurrentHP + "; "
+                    + "Mana - " + Mana + "; "
+                    + "CurrentMana - " + CurrentMana + "; "
+                    + "Damage - " + Damage + "; "
+                    + "Armor - " + Armor + "; "
+                    + "Experience - " + Experience);
+        }
+
     }
     public class heroSkill
     {
         public int Heal { get; set; }
         public int MassHeal { get; set; }
     }
+
 }
