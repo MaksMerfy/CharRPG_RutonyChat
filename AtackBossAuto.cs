@@ -326,7 +326,7 @@ namespace RutonyChat
             LabelBase.DictLabels[LabelBase.LabelType.Counter2].Format = "";
             foreach (Hero player in players.ListWarriors)
             {
-                LabelBase.DictLabels[LabelBase.LabelType.Counter2].Format += player.Name + "(" + player.CurrentHP + "/" + player.Mana + ")" + Environment.NewLine;
+                LabelBase.DictLabels[LabelBase.LabelType.Counter2].Format += player.Name + "(" + player.CurrentHP + "/" + player.CurrentMana + ")" + Environment.NewLine;
             }
             LabelBase.DictLabels[LabelBase.LabelType.Counter2].Save();
         }
