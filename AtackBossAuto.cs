@@ -3,12 +3,15 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Newtonsoft.Json;
+using NAudio;
+using NAudio.Wave;
 
 namespace RutonyChat
 {
     public class Script
     {
         public string FileDirectory = "";
+        public string fileNameAdministator = "";
         public string filename = "";
         public string filenamejpg = "";
         public string fileLogi = "";
@@ -16,9 +19,7 @@ namespace RutonyChat
         private string twnick = "";
         public Warriors players;
         public listBosses ListBosses;
-
         public currentBoss CurrentBoss;
-
         public void InitParams(string param)
         {
             FileDirectory = RutonyBotFunctions.GetScriptDirectory("AtackBossAuto.cs");
@@ -29,12 +30,12 @@ namespace RutonyChat
             filename = FileDirectory + @"\CurrentBoss.json";
             filenamejpg = FileDirectory + @"\CurrentBoss.png";
             fileLogi = FileDirectory + @"\Logirovanie.txt";
+            fileNameAdministator = FileDirectory + @"\Administator.txt";
             twnick = RutonyBot.TwitchBot.NICK.ToLower();
             players = GetListWarriors();
             ListBosses = GetListBosses();
             RutonyBot.SayToWindow("Скрипт атаки босса успешно подключен");
         }
-
         public void Closing()
         {
             savePlayerList();
@@ -42,7 +43,6 @@ namespace RutonyChat
             ListBosses = new listBosses();
             RutonyBot.SayToWindow("Скрипт атаки босса отключен");
         }
-
         public void NewMessage(string site, string name, string text, bool system)
         {
             if (site == "twitch")
@@ -52,26 +52,6 @@ namespace RutonyChat
                     return;
                 }
             }
-            /* bool TextHasAtack = text.ToLower().Contains("!атака");
-             if (TextHasAtack == true)
-             {
-                 Atack(name, site);
-             }
-             bool TextHasHeal = text.ToLower().Contains("!хил");
-             if (TextHasHeal == true)
-             {
-                 Heal(name, site, text);
-             }
-             bool TextHasMassHeal = text.ToLower().Contains("!массхил");
-             if (TextHasMassHeal == true)
-             {
-                 MassHeal(name, site);
-             }
-             bool TextHasPersonag = text.ToLower().Contains("!персонаж");
-             if (TextHasPersonag == true)
-             {
-                 Personag(name, site);
-             }*/
             switch (text.ToLower())
             {
                 case "!атака":
@@ -86,11 +66,109 @@ namespace RutonyChat
                 case "!персонаж":
                     Personag(name, site);
                     break;
+                case "!отступить":
+                    if (RutonyBotFunctions.FileHasString(fileNameAdministator, name))
+                    {
+                        StepBack();
+                    }
+                    break;
             }
             if (text.ToLower().Contains("!прокачать"))
             {
                 UpgradeSkill(name, site, text);
             }
+            if (text.ToLower().Contains("!создать"))
+            {
+                if (RutonyBotFunctions.FileHasString(fileNameAdministator, name))
+                {
+                    CreateBoss(text, site);
+                }
+            }
+        }
+        public void CreateBoss(string text, string site)
+        {
+            if (CurrentBoss != null && CurrentBoss.CurrentHP > 0)
+            {
+                RutonyBot.BotSay(site, CurrentBoss.Name + " уже создан!");
+                return;
+            }
+
+            string[] arrSplit = text.Split(' ');
+            string BossName = text.Replace(arrSplit[0] + " ", "");
+
+            ListBosses = GetListBosses();
+            string SelectBoss = "";
+            string NameBoss = "";
+            if (BossName != "")
+            {
+                string TryFindFile_Boss = FileDirectory + @"\NOD\" + BossName + ".json";
+                if (File.Exists(TryFindFile_Boss))
+                {
+                    NameBoss = BossName;
+                }
+            }
+            if (NameBoss == "")
+            {
+                Random rnd = new Random();
+                int rndstr = rnd.Next(1, ListBosses.ListBosses.Count);
+
+                NameBoss = ListBosses.ListBosses[rndstr - 1].Name;
+            }
+
+            try
+            {
+                File.Copy(FileDirectory + @"\NOD\" + NameBoss + ".json", FileDirectory + @"CurrentBoss.json", true);
+                string filename = FileDirectory + @"\CurrentBoss.json";
+                CurrentBoss = JsonConvert.DeserializeObject<currentBoss>(File.ReadAllText(filename));
+                UpdateLabels();
+            }
+            catch { }
+
+            try
+            {
+                WaveStream mainOutputStream = new Mp3FileReader(FileDirectory + @"\NOD\" + NameBoss + ".mp3");
+                WaveChannel32 volumeStream = new WaveChannel32(mainOutputStream);
+
+                WaveOutEvent player = new WaveOutEvent();
+                player.Init(volumeStream);
+                player.Play();
+            }
+            catch { }
+            try
+            {
+                File.Copy(FileDirectory + @"\NOD\" + NameBoss + ".png", FileDirectory + @"CurrentBoss.png", true);
+            }
+            catch { }
+        }
+        public void StepBack()
+        {
+            foreach (Hero player in players.ListWarriors)
+            {
+                player.CurrentHP = player.HP;
+                player.CurrentMana = player.Mana;
+                player.DoneDamage = 0;
+            }
+            CurrentBoss = null;
+            savePlayerList();
+            players = new Warriors();
+            try
+            {
+                File.Delete(filename);
+            }
+            catch { }
+
+            try
+            {
+                File.Delete(filenamejpg);
+            }
+            catch { }
+
+            try
+            {
+                File.Delete(fileLogi);
+            }
+            catch { }
+            UpdateLabels();
         }
         public void UpgradeSkill(string name, string site, string text)
         {
@@ -235,7 +313,12 @@ namespace RutonyChat
         }
         public void UpdateLabels()
         {
-            LabelBase.DictLabels[LabelBase.LabelType.Counter1].Format = "Name : " + CurrentBoss.Name + Environment.NewLine + "HP : " + CurrentBoss.CurrentHP;
+            LabelBase.DictLabels[LabelBase.LabelType.Counter1].Format = "";
+            if (CurrentBoss != null)
+            {
+                LabelBase.DictLabels[LabelBase.LabelType.Counter1].Format = "Name : " + CurrentBoss.Name + Environment.NewLine + "HP : " + CurrentBoss.CurrentHP;
+
+            }
             LabelBase.DictLabels[LabelBase.LabelType.Counter1].Save();
 
             LabelBase.DictLabels[LabelBase.LabelType.Counter2].Format = "";
@@ -380,9 +463,7 @@ namespace RutonyChat
             if (File.Exists(fileListBosses))
             {
                 string[] filetexts = File.ReadAllLines(fileListBosses);
-
                 ListBosses = JsonConvert.DeserializeObject<listBosses>(filetexts[0]);
-
             }
 
             foreach (currentBoss boss in ListBosses.ListBosses)
