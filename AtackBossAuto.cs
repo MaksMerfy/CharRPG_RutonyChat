@@ -57,9 +57,6 @@ namespace RutonyChat
                 case "!атака":
                     Atack(name, site);
                     break;
-                case "!хил":
-                    Heal(name, site, text);
-                    break;
                 case "!массхил":
                     MassHeal(name, site);
                     break;
@@ -83,6 +80,10 @@ namespace RutonyChat
                 {
                     CreateBoss(text, site);
                 }
+            }
+            if (text.ToLower().Contains("!хил"))
+            {
+                Heal(name, site, text);
             }
         }
         public void CreateBoss(string text, string site)
@@ -298,6 +299,7 @@ namespace RutonyChat
                 savePlayerList();
                 LabelBase.DictLabels[LabelBase.LabelType.Counter2].Format = format;
                 LabelBase.DictLabels[LabelBase.LabelType.Counter2].Save();
+                players = new Warriors();
 
                 try
                 {
