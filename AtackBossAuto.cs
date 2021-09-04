@@ -52,9 +52,10 @@ namespace RutonyChat
                     return;
                 }
             }
+            string namePlayerIsAdmin = RutonyBot.ListAdmins.Find(x => x == name);
             switch (text.ToLower())
             {
-                case "!атака":
+                case "атака":
                     Atack(name, site);
                     break;
                 case "!массхил":
@@ -64,9 +65,15 @@ namespace RutonyChat
                     Personag(name, site);
                     break;
                 case "!отступить":
-                    if (RutonyBotFunctions.FileHasString(fileNameAdministator, name))
+                    if (namePlayerIsAdmin != null)
                     {
                         StepBack();
+                    }
+                    break;
+                case "!списокбоссов":
+                    if (namePlayerIsAdmin != null)
+                    {
+                        SayListBosses(site);
                     }
                     break;
             }
@@ -76,16 +83,54 @@ namespace RutonyChat
             }
             if (text.ToLower().Contains("!создать"))
             {
-                string namePlayerIsAdmin = RutonyBot.ListAdmins.Find(x => x == name);
                 if (namePlayerIsAdmin != null)
-                {;
+                {
                     CreateBoss(text, site);
+                }
+            }
+            if (text.ToLower().Contains("!автосоздание"))
+            {
+                if (namePlayerIsAdmin != null)
+                {
+                    AutoCreateBoss(text, site);
                 }
             }
             if (text.ToLower().Contains("!хил"))
             {
                 Heal(name, site, text);
             }
+        }
+
+        public void SayListBosses(string site)
+        {
+            foreach (currentBoss curBosForSay in ListBosses.ListBosses)
+            {
+                RutonyBot.BotSay(site, curBosForSay.Name);
+            }
+
+        }
+        public void AutoCreateBoss(string text, string site)
+        {
+            string[] arrSplit = text.Split(' ');
+            string nameOfDo = text.Replace(arrSplit[0] + " ", "");
+            RutonyBot.SayToWindow(nameOfDo);
+            bool succesActivate = false;
+            foreach (ScriptsControl.AutoScriptItem asItem in ScriptsControl.ListActiveScripts)
+            {
+                if (asItem.Script.ScriptName == "AutoCreateBoss.cs")
+                {
+
+                    if (nameOfDo.ToLower().Contains("вкл")){
+                        asItem.ScriptThread.AutoCreateIsActive = true;
+                    }
+                    else{
+                        asItem.ScriptThread.AutoCreateIsActive = false;
+                    }
+                    succesActivate = asItem.ScriptThread.AutoCreateIsActive;
+                }
+
+            }
+            RutonyBot.BotSay(site, "Автосоздание - " + succesActivate);
         }
         public void CreateBoss(string text, string site)
         {
@@ -179,41 +224,53 @@ namespace RutonyChat
             string[] arrSplit = text.Split(' ');
             string NameSkill = text.Replace(arrSplit[0] + " ", "");
             int CurLvlUpSkill = 0;
+            bool canUpgrade = false;
 
             switch (NameSkill)
             {
                 case "хп":
                     CurLvlUpSkill = thisWarrior.HP - 100;
                     CurLvlUpSkill = (CurLvlUpSkill / 10);
-                    thisWarrior.HP += (CheckExpHero(thisWarrior, CurLvlUpSkill, site)) ? 10 : 0;
+                    canUpgrade = CheckExpHero(thisWarrior, CurLvlUpSkill, site);
+                    thisWarrior.HP += (canUpgrade == true) ? 10 : 0;
                     break;
                 case "урон":
                     CurLvlUpSkill = thisWarrior.Damage - 1;
-                    thisWarrior.Damage += (CheckExpHero(thisWarrior, CurLvlUpSkill, site)) ? 1 : 0;
+                    canUpgrade = CheckExpHero(thisWarrior, CurLvlUpSkill, site);
+                    thisWarrior.Damage += (canUpgrade == true) ? 1 : 0;
                     break;
                 case "броня":
                     CurLvlUpSkill = thisWarrior.Armor - 1;
-                    thisWarrior.Armor += (CheckExpHero(thisWarrior, CurLvlUpSkill, site)) ? 1 : 0;
+                    canUpgrade = CheckExpHero(thisWarrior, CurLvlUpSkill, site);
+                    thisWarrior.Armor += (canUpgrade == true) ? 1 : 0;
                     break;
                 case "мана":
                     CurLvlUpSkill = thisWarrior.Mana - 0;
                     CurLvlUpSkill = (CurLvlUpSkill / 10);
-                    thisWarrior.Mana += (CheckExpHero(thisWarrior, CurLvlUpSkill, site)) ? 10 : 0;
+                    canUpgrade = CheckExpHero(thisWarrior, CurLvlUpSkill, site);
+                    thisWarrior.Mana += (canUpgrade == true) ? 10 : 0;
                     break;
                 case "хил":
                     CurLvlUpSkill = thisWarrior.heroSkill.Heal - 0;
                     CurLvlUpSkill = (CurLvlUpSkill / 5);
-                    thisWarrior.heroSkill.Heal += (CheckExpHero(thisWarrior, CurLvlUpSkill, site)) ? 5 : 0;
+                    canUpgrade = CheckExpHero(thisWarrior, CurLvlUpSkill, site);
+                    thisWarrior.heroSkill.Heal += (canUpgrade == true) ? 5 : 0;
                     break;
                 case "массхил":
                     CurLvlUpSkill = thisWarrior.heroSkill.MassHeal - 0;
-                    thisWarrior.heroSkill.MassHeal += (CheckExpHero(thisWarrior, CurLvlUpSkill, site)) ? 1 : 0;
+                    canUpgrade = CheckExpHero(thisWarrior, CurLvlUpSkill, site);
+                    thisWarrior.heroSkill.MassHeal += (canUpgrade == true) ? 1 : 0;
+                    break;
+                case "крит":
+                    CurLvlUpSkill = thisWarrior.ChanceCritDamage - 1;
+                    canUpgrade = CheckExpHero(thisWarrior, CurLvlUpSkill, site);
+                    thisWarrior.ChanceCritDamage += (canUpgrade == true) ? 1 : 0;
                     break;
                 default:
-                    RutonyBot.BotSay(site, name + ", не понимаю, что хочешь прокачать. Можно прокачать : хп, урон, броня, мана, хил, массхил");
+                    RutonyBot.BotSay(site, name + ", не понимаю, что хочешь прокачать. Можно прокачать : хп, урон, броня, мана, хил, массхил, крит");
                     return;
             }
-            thisWarrior.Experience -= (100 + (CurLvlUpSkill * 10));
+            thisWarrior.Experience -= (canUpgrade == true) ? (100 + (CurLvlUpSkill * 10)) : 0;
             Personag(name, site);
 
         }
@@ -259,6 +316,7 @@ namespace RutonyChat
             int rndAtack = rnd.Next(1, 100);
             int rndAvoid = rnd.Next(1, 100);
             int rndBlock = rnd.Next(1, 100);
+            int rndChanceCrit = rnd.Next(1, 100);
 
             int CurDamage = 0;
             int CurDamageBoss = 0;
@@ -280,7 +338,7 @@ namespace RutonyChat
             }
             else
             {
-                CurDamage += (thiswarrior.Damage - CurrentBoss.Armor);
+                CurDamage += (thiswarrior.Damage + ((rndChanceCrit <= thiswarrior.ChanceCritDamage) ? thiswarrior.Damage : 0) - CurrentBoss.Armor);
                 CurDamage = Math.Max(1, CurDamage);
                 CurrentBoss.CurrentHP -= CurDamage;
                 OutPutMessage = string.Format("{0} бьет {3}а на {1} урона! У {3} осталось {2} здоровья!", name, CurDamage, CurrentBoss.CurrentHP, CurrentBoss.Name);
@@ -292,7 +350,7 @@ namespace RutonyChat
             if (CurrentBoss.CurrentHP <= 0)
             {
                 string format = "";
-                RutonyBot.BotSay(site, string.Format("{0} добивает {1}а! Всем участники получают опыт!", name, CurrentBoss.Name));
+                RutonyBot.BotSay(site, string.Format("{0} добивает {1}а! Все участники получают опыт!", name, CurrentBoss.Name));
                 foreach (Hero player in players.ListWarriors)
                 {
                     format += "" + player.Name + " + " + player.DoneDamage + " EXP" + Environment.NewLine;
@@ -301,6 +359,7 @@ namespace RutonyChat
                 LabelBase.DictLabels[LabelBase.LabelType.Counter2].Format = format;
                 LabelBase.DictLabels[LabelBase.LabelType.Counter2].Save();
                 players = new Warriors();
+                CurrentBoss = null;
 
                 try
                 {
@@ -567,6 +626,7 @@ namespace RutonyChat
         public int Mana { get; set; }
         public int CurrentMana { get; set; }
         public int Damage { get; set; }
+        public int ChanceCritDamage { get; set; }
         public int DoneDamage { get; set; }
         public int Armor { get; set; }
         public int Experience { get; set; }
@@ -582,6 +642,7 @@ namespace RutonyChat
                     + "CurrentMana - " + CurrentMana + "; "
                     + "Damage - " + Damage + "; "
                     + "Armor - " + Armor + "; "
+                    + "Chance Crit - " + ChanceCritDamage + "; "
                     + "Experience - " + Experience);
         }
 
