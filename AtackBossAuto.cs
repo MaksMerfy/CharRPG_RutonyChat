@@ -76,8 +76,9 @@ namespace RutonyChat
             }
             if (text.ToLower().Contains("!создать"))
             {
-                if (RutonyBotFunctions.FileHasString(fileNameAdministator, name))
-                {
+                string namePlayerIsAdmin = RutonyBot.ListAdmins.Find(x => x == name);
+                if (namePlayerIsAdmin != null)
+                {;
                     CreateBoss(text, site);
                 }
             }
